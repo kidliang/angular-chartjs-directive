@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="zh-CN" ng-app="SubmitApp">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>填写表单 - 测验作业系统</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="css/style.css" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand" href="index.html"><i class="fas fa-chart-bar me-2"></i>测验作业系统</a>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="index.html">返回首页</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container" ng-controller="SubmitController">
+        <!-- 加载中 -->
+        <div ng-show="loading" class="text-center mt-5">
+            <div class="loading"></div>
+            <p class="mt-3">正在加载表单...</p>
+        </div>
+
+        <!-- 表单不存在 -->
+        <div ng-show="!loading && !form" class="text-center mt-5">
+            <i class="fas fa-exclamation-triangle fa-3x text-warning mb-3"></i>
+            <h3>表单不存在</h3>
+            <p class="text-muted">请检查链接是否正确，或联系管理员</p>
+            <a href="index.html" class="btn btn-primary">返回首页</a>
+        </div>
+
+        <!-- 已提交成功 -->
+        <div ng-show="submitted" class="text-center mt-5">
+            <i class="fas fa-check-circle fa-3x text-success mb-3"></i>
+            <h3>提交成功！</h3>
+            <p class="text-muted">感谢您的参与，您的答案已保存</p>
+            <div class="mt-4">
+                <button class="btn btn-primary me-2" ng-click="resetForm()">重新填写</button>
+                <a href="index.html" class="btn btn-outline-primary">返回首页</a>
+            </div>
+        </div>
+
+        <!-- 表单内容 -->
+        <div ng-show="!loading && form && !submitted" class="row mt-4">
+            <div class="col-md-8 mx-auto">
+                <div class="card">
+                    <div class="card-header">
+                        <h4><i class="fas" ng-class="{
+                            'fa-question-circle': form.type === 'quiz',
+                            'fa-file-alt': form.type === 'assignment',
+                            'fa-poll': form.type === 'survey'
+                        }" class="me-2"></i>{{ form.title }}</h4>
+                        <div class="mt-2">
+                            <span class="badge" ng-class="{
+                                'bg-primary': form.type === 'quiz',
+                                'bg-success': form.type === 'assignment', 
+                                'bg-info': form.type === 'survey'
+                            }">
+                                {{ getTypeLabel(form.type) }}
+                            </span>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div ng-if="form.description" class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>{{ form.description }}
+                        </div>
+
+                        <form ng-submit="submitForm()" name="answerForm">
+                            <div ng-repeat="question in form.questions track by $index" class="question-card">
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold">
+                                        <span class="badge bg-secondary me-2">{{ $index + 1 }}</span>
+                                        {{ question.text }}
+                                        <span ng-if="question.required" class="text-danger">*</span>
+                                    </label>
+
+                                    <!-- 文本输入 -->
+                                    <div ng-if="question.type === 'text'">
+                                        <textarea class="form-control" ng-model="answers[$index].value" 
+                                                rows="3" placeholder="请输入您的答案..."
+                                                ng-required="question.required"></textarea>
+                                    </div>
+
+                                    <!-- 数字输入 -->
+                                    <div ng-if="question.type === 'number'">
+                                        <input type="number" class="form-control" ng-model="answers[$index].value" 
+                                               placeholder="请输入数字" ng-required="question.required">
+                                    </div>
+
+                                    <!-- 单选题 -->
+                                    <div ng-if="question.type === 'choice'">
+                                        <div ng-repeat="option in question.options track by $index" class="form-check">
+                                            <input class="form-check-input" type="radio" 
+                                                   ng-model="answers[$parent.$index].value" 
+                                                   ng-value="option.value"
+                                                   name="question_{{ $parent.$index }}"
+                                                   id="q{{ $parent.$index }}_opt{{ $index }}">
+                                            <label class="form-check-label" for="q{{ $parent.$index }}_opt{{ $index }}">
+                                                {{ option.text }}
+                                            </label>
+                                        </div>
+                                    </div>
+
+                                    <!-- 多选题 -->
+                                    <div ng-if="question.type === 'multiple'">
+                                        <div ng-repeat="option in question.options track by $index" class="form-check">
+                                            <input class="form-check-input" type="checkbox" 
+                                                   ng-model="answers[$parent.$index].selected[$index]"
+                                                   id="q{{ $parent.$index }}_mult{{ $index }}">
+                                            <label class="form-check-label" for="q{{ $parent.$index }}_mult{{ $index }}">
+                                                {{ option.text }}
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 提交按钮 -->
+                            <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
+                                <button type="button" class="btn btn-secondary" ng-click="resetAnswers()">重置</button>
+                                <button type="submit" class="btn btn-primary" ng-disabled="answerForm.$invalid || submitting">
+                                    <span ng-if="submitting">
+                                        <span class="spinner-border spinner-border-sm me-2"></span>
+                                        提交中...
+                                    </span>
+                                    <span ng-if="!submitting">
+                                        <i class="fas fa-paper-plane me-2"></i>提交答案
+                                    </span>
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- 提交提示 -->
+                <div class="card mt-3">
+                    <div class="card-body">
+                        <div class="row text-center">
+                            <div class="col-md-4">
+                                <i class="fas fa-shield-alt text-primary"></i>
+                                <small class="d-block mt-1">数据安全</small>
+                            </div>
+                            <div class="col-md-4">
+                                <i class="fas fa-clock text-success"></i>
+                                <small class="d-block mt-1">随时保存</small>
+                            </div>
+                            <div class="col-md-4">
+                                <i class="fas fa-user-check text-info"></i>
+                                <small class="d-block mt-1">匿名提交</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- AngularJS -->
+    <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.8.2/angular.min.js"></script>
+    <!-- 提交页面脚本 -->
+    <script src="js/submit.js"></script>
+</body>
+</html>
